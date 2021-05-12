@@ -1,5 +1,7 @@
 {
     "files.associations": {
         "system_error": "cpp"
-    }
+    },
+    "C_Cpp.errorSquiggles": "Enabled",
+    "C_Cpp.default.systemIncludePath": []
 }

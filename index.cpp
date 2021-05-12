@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+
 using namespace std;
 int MAX = 3;
 
@@ -12,45 +13,126 @@ struct Node {
 	bool IS_LEAF;
 	int size;
     vector<int> key;
+	vector<int> value;
 	vector<Node*> ptr;
     //Node建構的時候會出使化大小
 	Node(){
         key = vector<int>(MAX);
+		value = vector<int>(MAX);
 	    ptr = vector<Node*>(MAX + 1);
     }
 };
 
 // BP tree
-class BPTree {
+class Index {
 	Node* root;
-	void insertInternal(int, Node*, Node*);
+	void insertInternal(int, int, Node*, Node*);
 	Node* findParent(Node*, Node*);
 
 public:
-	BPTree();
-	void search(int);
-	void insert(int);
+	Index();
+	Index(int num_rows, vector<int>& key, vector<int>& value);
+	int search(int);
+	void key_query(vector<int>&);
+	void range_query(vector<pair<int, int>>&);
+	void insert(int, int);
 	void display(Node*);
 	Node* getRoot();
 };
 
-// Initialise the BPTree Node
-BPTree::BPTree() {
+// Initialise the Index Node
+Index::Index() {
 	root = NULL;
 }
 
-// Function to find any element
-// in B+ Tree
-void BPTree::search(int x) {
+Index::Index(int num_rows, vector<int>& key, vector<int>& value) {
+	for(int i = 0;i < num_rows;i++){
+		this->insert(key[i], value[i]);
+	}
+}
+
+void Index::key_query(vector<int>& key) {
+	ofstream output;
+	output.open("key_query_out.txt");
+
+	for(auto k : key) {
+		int temp = this->search(k);
+		output << temp << endl;
+	}
+	output.close();
+}
+
+void Index::range_query(vector<pair<int,int>>& pp){
+	ofstream output;
+	output.open("range_query_out.txt");
+
+	if (root == NULL){
+		output << -1 << endl;
+		return;
+	}
+	else {
+		Node* cursor = root;
+
+		for(auto p : pp){
+			// 查詢到是leaf為止 找到 lb
+			while (cursor->IS_LEAF == false) {
+
+				for (int i = 0;i < cursor->size; i++) {
+
+					// 這個比較大的話回傳左邊的指標
+					if (p.first < cursor->key[i]) {
+						cursor = cursor->ptr[i];
+						break;
+					}
+
+					// I找完整個比全部都大 回傳最右邊的
+					if (i == cursor->size - 1) {
+						cursor = cursor->ptr[i + 1];
+						break;
+					}
+				}
+			}
+
+			int maxValue = -1;
+
+			// 到達leaf層之後 遍歷整個key陣列找值
+			bool ubIsFound = false;
+			while(cursor != NULL) {
+				for (int i = 0;i < cursor->size; i++) {
+					//找到了 ub
+					if (cursor->key[i] > p.second) {
+						ubIsFound = true;
+						break;
+					}
+					else if(cursor->key[i] >= p.first && cursor->key[i] <= p.second){
+						if(cursor->value[i] > maxValue)
+							maxValue = cursor->value[i];
+					}
+				}
+				if (ubIsFound){
+					output << maxValue << endl;
+					break;
+				}
+				else
+					cursor = cursor->ptr[cursor->size];
+			}
+			if(!ubIsFound)
+				output << -1 << endl;
+		}
+	}
+}
+
+
+
+int Index::search(int x) {
 
 	// If tree is empty
-	if (root == NULL) {
-		cout << "Tree is empty\n";
-	}
+	if (root == NULL) 
+		return -1;
+
 
 	// Traverse to find the value
 	else {
-
 		Node* cursor = root;
 
 		// 查詢到是leaf為止
@@ -75,22 +157,22 @@ void BPTree::search(int x) {
 		// 到達leaf層之後 遍歷整個key陣列找值
 		for (int i = 0;i < cursor->size; i++) {
 			if (cursor->key[i] == x) {
-				cout << "Found\n";
-				return;
+				return cursor->value[i];
 			}
 		}
-		cout << "Not found\n";
+		return -1;
 	}
 }
 
 // Function to implement the Insert
 // Operation in B+ Tree
-void BPTree::insert(int x) {
+void Index::insert(int key, int value) {
 
 	// 如果完全沒有Node 就初始化一個 並且他自己就是一個leaf
 	if (root == NULL) {
 		root = new Node;
-		root->key[0] = x;
+		root->key[0] = key;
+		root->value[0] = value;
 		root->IS_LEAF = true;
         //size是紀錄現在實際上有幾個值在vector裡面
 		root->size = 1;
@@ -108,12 +190,12 @@ void BPTree::insert(int x) {
 
 			for (int i = 0;i < cursor->size;i++) {
 				// 找到可以insert的位置
-				if (x < cursor->key[i]) {
+				if (key < cursor->key[i]) {
 					cursor = cursor->ptr[i];
 					break;
 				}
 
-				// 這個執筆全部都大 右邊新增
+				// 這個值筆全部都大 右邊新增
 				if (i == cursor->size - 1) {
 					cursor = cursor->ptr[i + 1];
 					break;
@@ -125,16 +207,18 @@ void BPTree::insert(int x) {
 		if (cursor->size < MAX) {
 			int i = 0;
             //找到合適的position
-			while (x > cursor->key[i] && i < cursor->size) {
+			while (key > cursor->key[i] && i < cursor->size) {
 				i++;
 			}
 
-            //插入數值的過程 很慢
+            //插入數值的過程 
 			for (int j = cursor->size;j > i; j--) {
                 cursor->key[j] = cursor->key[j - 1];
+				cursor->value[j] = cursor->value[j - 1];
 			}
 
-			cursor->key[i] = x;
+			cursor->key[i] = key;
+			cursor->value[i] = value;
 			cursor->size++;
 
             //重新調整pointer指向 主要調整最右邊那個
@@ -148,26 +232,32 @@ void BPTree::insert(int x) {
 			Node* newLeaf = new Node;
 
             //建立一個運算用的array
-			int virtualNode[MAX + 1];
+			int virtualKeyArray[MAX + 1];
+			int virtualValueArray[MAX + 1];
+			
 
 			// 複製原陣列到運算用陣列
 			for (int i = 0; i < MAX; i++) {
-				virtualNode[i] = cursor->key[i];
+				virtualKeyArray[i] = cursor->key[i];
+				virtualKeyArray[i] = cursor->value[i];
 			}
+
 			int i = 0, j;
 
 			// Traverse to find where the new
 			// node is to be inserted
-			while (x > virtualNode[i] && i < MAX) {
+			while (key > virtualKeyArray[i] && i < MAX) {
 				i++;
 			}
 
 			// 運算用陣列進行插入
 			for (int j = MAX + 1;j > i; j--) {
-                virtualNode[j] = virtualNode[j - 1];
+                virtualKeyArray[j] = virtualKeyArray[j - 1];
+				virtualValueArray[j] = virtualValueArray[j - 1];
 			}
 
-			virtualNode[i] = x;
+			virtualKeyArray[i] = key;
+			virtualValueArray[i] = value;
 			newLeaf->IS_LEAF = true;
 
             //切割陣列
@@ -182,15 +272,18 @@ void BPTree::insert(int x) {
 
 			// Update the current virtual
 			// Node's key to its previous
-			for (i = 0;i < cursor->size; i++) 
-				cursor->key[i] = virtualNode[i];
+			for (i = 0;i < cursor->size; i++) {
+				cursor->key[i] = virtualKeyArray[i];
+				cursor->value[i] = virtualValueArray[i];
+			}
 			
 
 			// Update the newLeaf key to
 			// virtual Node
-			for (i = 0, j = cursor->size;i < newLeaf->size;i++, j++) 
-				newLeaf->key[i]= virtualNode[j];
-			
+			for (i = 0, j = cursor->size;i < newLeaf->size;i++, j++) {
+				newLeaf->key[i]= virtualKeyArray[j];
+				newLeaf->value[i] = virtualValueArray[j];
+			}
 
 			// If cursor is the root node
 			if (cursor == root) {
@@ -198,9 +291,9 @@ void BPTree::insert(int x) {
 				// Create a new Node
 				Node* newRoot = new Node;
 
-				// Update rest field of
-				// B+ Tree Node
+				// 最一開始的時候的情況
 				newRoot->key[0] = newLeaf->key[0];
+				newRoot->value[0] = newLeaf->value[0];
 				newRoot->ptr[0] = cursor;
 				newRoot->ptr[1] = newLeaf;
 				newRoot->IS_LEAF = false;
@@ -209,106 +302,97 @@ void BPTree::insert(int x) {
 			}
 			else {
 
-				// Recursive Call for
-				// insert in internal
-				insertInternal(newLeaf->key[0], parent, newLeaf);
+				// 如果現在這裡不是root => 上面有parent
+				insertInternal(newLeaf->key[0], newLeaf->value[0], parent, newLeaf);
 			}
 		}
 	}
 }
 
-// Function to implement the Insert
-// Internal Operation in B+ Tree
-void BPTree::insertInternal(int x, Node* cursor, Node* child){
+void Index::insertInternal(int key, int value, Node* cursor, Node* child){
 
-	// If we doesn't have overflow
+	// parent 還沒放滿
 	if (cursor->size < MAX) {
 		int i = 0;
 
-		// Traverse the child node
-		// for current cursor node
-		while (x > cursor->key[i] && i < cursor->size) 
+		//找到插入點
+		while (key > cursor->key[i] && i < cursor->size) 
 			i++;
 
-		// Traverse the cursor node
-		// and update the current key
-		// to its previous node key
-		for (int j = cursor->size;j > i; j--) 
+		// 調整插入後的key跟value
+		for (int j = cursor->size;j > i; j--) {
 			cursor->key[j] = cursor->key[j - 1];
+			cursor->value[j] = cursor->value[j - 1];
+		}
 		
 
-		// Traverse the cursor node
-		// and update the current ptr
-		// to its previous node ptr
+		// 調整插入後的指標
 		for (int j = cursor->size + 1;j > i + 1; j--) 
 			cursor->ptr[j] = cursor->ptr[j - 1];
 		
-		cursor->key[i] = x;
+		//最後將值插入
+		cursor->key[i] = key;
+		cursor->value[i] = value;
 		cursor->size++;
 		cursor->ptr[i + 1] = child;
 	}
 
-	// For overflow, break the node
+	// parent已經放滿了
 	else {
 
-		// For new Interval
+		// 建立一個更上面新parent
 		Node* newInternal = new Node;
-		int virtualKey[MAX + 1];
+		int virtualKeyArray[MAX + 1];
+		int virtualValueArray[MAX + 1];
 		Node* virtualPtr[MAX + 2];
 
-		// Insert the current list key
-		// of cursor node to virtualKey
-		for (int i = 0; i < MAX; i++) 
-			virtualKey[i] = cursor->key[i];
+		// 將key跟pointer放入運算用的array
+		for (int i = 0; i < MAX; i++) {
+			virtualKeyArray[i] = cursor->key[i];
+			virtualValueArray[i] = cursor->value[i];
+		}
 		
-
-		// Insert the current list ptr
-		// of cursor node to virtualPtr
 		for (int i = 0; i < MAX + 1; i++) 
 			virtualPtr[i] = cursor->ptr[i];
 		
 		int i = 0, j;
 
-		// Traverse to find where the new
-		// node is to be inserted
-		while (x > virtualKey[i] && i < MAX) 
+		// 找到合適的插入點
+		while (key > virtualKeyArray[i] && i < MAX) 
 			i++;
 		
 
-		// Traverse the virtualKey node
-		// and update the current key
-		// to its previous node key
-		for (int j = MAX + 1;j > i; j--) 
-			virtualKey[j] = virtualKey[j - 1];
-		
+		//調整插入後的key
+		for (int j = MAX + 1;j > i; j--) {
+			virtualKeyArray[j] = virtualKeyArray[j - 1];
+			virtualValueArray[j] = virtualValueArray[j - 1];
+		}
+		virtualKeyArray[i] = key;
 
-		virtualKey[i] = x;
 
-		// Traverse the virtualKey node
-		// and update the current ptr
-		// to its previous node ptr
+		// 調整插入後的pointer
 		for (int j = MAX + 2;j > i + 1; j--) 
 			virtualPtr[j] = virtualPtr[j - 1];
-		
-
 		virtualPtr[i + 1] = child;
 		newInternal->IS_LEAF = false;
 
+		//切割
 		cursor->size = (MAX + 1) / 2;
 
 		newInternal->size = MAX - (MAX + 1) / 2;
 
-		// Insert new node as an
-		// internal node
-		for (i = 0, j = cursor->size + 1;i < newInternal->size;i++, j++) 
-			newInternal->key[i] = virtualKey[j];
+		// 運算完的放入新的node
+		for (i = 0, j = cursor->size + 1;i < newInternal->size;i++, j++) {
+			newInternal->key[i] = virtualKeyArray[j];
+			newInternal->value[i] =virtualValueArray[j];
+		}
 		
 
 		for (i = 0, j = cursor->size + 1;i < newInternal->size + 1;i++, j++) 
 			newInternal->ptr[i] = virtualPtr[j];
 		
 
-		// If cursor is the root node
+		// 如果已經推到頂是root了
 		if (cursor == root) {
 
 			// Create a new root node
@@ -316,6 +400,7 @@ void BPTree::insertInternal(int x, Node* cursor, Node* child){
 
 			// Update key value
 			newRoot->key[0] = cursor->key[cursor->size];
+			newRoot->value[0] = cursor->value[cursor->size];
 
 			// Update rest field of
 			// B+ Tree Node
@@ -326,11 +411,14 @@ void BPTree::insertInternal(int x, Node* cursor, Node* child){
 			root = newRoot;
 		}
 
+		//沒有的話再往上推 到沒有滿的parent或是抵達root為止
 		else {
 
 			// Recursive Call to insert
 			// the data
-			insertInternal(cursor->key[cursor->size],
+			insertInternal(
+				cursor->key[cursor->size],
+				cursor->value[cursor->size],
 				findParent(root,cursor),
 				newInternal);
 		}
@@ -338,7 +426,7 @@ void BPTree::insertInternal(int x, Node* cursor, Node* child){
 }
 
 // Function to find the parent node
-Node* BPTree::findParent(Node* cursor,Node* child) {
+Node* Index::findParent(Node* cursor,Node* child) {
 	Node* parent;
 
 	// If cursor reaches the end of Tree
@@ -374,26 +462,23 @@ Node* BPTree::findParent(Node* cursor,Node* child) {
 }
 
 // Function to get the root Node
-Node* BPTree::getRoot()
+Node* Index::getRoot()
 {
 	return root;
 }
 
 // Driver Code
-int main()
-{
-	BPTree node;
+int main() {	
+	vector<int> key = {6, 16, 26, 36, 46};
+	vector<int> value = {5, 4, 3, 2, 1};
+	Index node(5, key, value);
 
 	// Create B+ Tree
-	node.insert(6);
-	node.insert(16);
-	node.insert(26);
-	node.insert(36);
-	node.insert(46);
 
 	// Function Call to search node
 	// with value 16
-	node.search(16);
+	vector<int> key_list = {16, 26};
+	node.key_query(key_list);
 
 	return 0;
 }

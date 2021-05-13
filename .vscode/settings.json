@@ -1,6 +1,7 @@
 {
     "files.associations": {
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "iosfwd": "cpp"
     },
     "C_Cpp.errorSquiggles": "Enabled",
     "C_Cpp.default.systemIncludePath": []

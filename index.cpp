@@ -2,6 +2,9 @@
 int ORDER = 100;
 
 Node::Node(){
+	key = vector<int>(ORDER);
+	value = vector<int>(ORDER);
+	ptr = vector<Node*>(ORDER);
 	for(int i = 0;i < ORDER + 1;i++){
     	ptr[i]=NULL;
   	}
@@ -26,35 +29,33 @@ void Index::key_query(vector<int>& key) {
 }
 
 void Index::range_query(vector<pair<int,int>>& r){
+	ofstream output;
 	int maxValue;
 	Node *cursor;
-	ofstream output;
-	output.open("key_query_out.txt");
-
-	for(int i = 0;i < r.size();i++){
+	output.open("range_query_out.txt");
+	for (int i = 0; i < r.size(); i++){
 		cursor = searchLeaf(r[i].first);
-		maxValue = -1000000001;
-		while(true){
-			for(int j = 0;j < cursor->size;j++){
-				if(cursor->key[j] >= r[i].first && cursor->key[j] <= r[i].second && cursor->value[j] > maxValue){
+		maxValue = -1000001;
+		while (true){
+			for (int j = 0; j < cursor->size; j++){
+				if (cursor->key[j] >= r[i].first && cursor->key[j] <= r[i].second && cursor->value[j] > maxValue)
 					maxValue = cursor->value[j];
-				}
 			}
-			if(r[i].second <= cursor->key[cursor->size-1])
+
+			if (r[i].second <= cursor->key[cursor->size - 1])
 				break;
-			
 			else{
 				cursor = cursor->ptr[cursor->size];
-				if(cursor == NULL)
+				if (cursor == NULL)
 					break;
 			}
 		}
-		if(maxValue != -1000000001) {
+		if (maxValue != -1000001)
 			output << maxValue << endl;
-		}
-		else {
+		
+		else
 			output << -1 << endl;
-		}
+		
 	}
 	output.close();
 }
@@ -396,20 +397,6 @@ void Index::deleteBp(Node* cursor) {
 	}
 
 	delete(cursor);
-}
-
-void Index::display(Node *cursor) {
-  if (cursor != NULL) {
-    for (int i = 0; i < cursor->size; i++) {
-      cout << cursor->key[i] << " ";
-    }
-    cout << "\n";
-    if (cursor->IS_LEAF != true) {
-      for (int i = 0; i < cursor->size + 1; i++) {
-        display(cursor->ptr[i]);
-      }
-    }
-  }
 }
 
 // Function to get the root Node

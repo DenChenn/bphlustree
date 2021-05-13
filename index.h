@@ -33,7 +33,6 @@ public:
 	Node* getRoot();
 	void clear_index();
 	void deleteBp(Node*);
-    void display(Node*);
 	Node* searchLeaf(int);
 };
 #endif
